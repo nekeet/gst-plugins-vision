@@ -54,6 +54,9 @@ macro_log_feature(GOBJECT_FOUND "GObject" "Required to build gst-plugins-vision"
 find_package(Orc REQUIRED)
 macro_log_feature(ORC_FOUND "Orc" "Required library to improve performance" "http://code.entropywave.com/orc/" TRUE)
 
+find_package(Baumer)
+macro_log_feature(BAUMER_FOUND "Baumer GAPI" "Required to build Baumer GAPI source element" "http://www.baumer.com/" FALSE)
+
 find_package(Bitflow)
 macro_log_feature(BITFLOW_FOUND "BitFlow" "Required to build BitFlow source element" "http://www.bitflow.com/" FALSE)
 

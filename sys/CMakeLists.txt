@@ -2,6 +2,10 @@ if (APTINA_FOUND)
 	add_subdirectory(aptina)
 endif (APTINA_FOUND)
 
+if (BAUMER_FOUND)
+	add_subdirectory(baumer)
+endif (BAUMER_FOUND)
+
 if (BITFLOW_FOUND)
 	add_subdirectory(bitflow)
 endif (BITFLOW_FOUND)
