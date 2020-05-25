@@ -18,6 +18,7 @@
 GST_DEBUG_CATEGORY_STATIC (gst_baumer_src_debug);
 #define GST_CAT_DEFAULT gst_baumer_src_debug
 
+/* TODO: Modify to accept additional args e.g. index */
 #define HANDLE_BGAPI2_ERROR(arg)  \
         if (ret != BGAPI2_RESULT_SUCCESS) {   \
                 GST_ELEMENT_ERROR(src, LIBRARY, FAILED, \
@@ -324,6 +325,7 @@ gst_baumer_src_finalize (GObject * object)
         G_OBJECT_CLASS (gst_baumer_src_parent_class)->finalize (object);
 }
 
+
 #define BGAPI2_MAX_STR_SIZE 128
 
 void
@@ -414,6 +416,37 @@ gst_baumer_src_prepare_buffers (GstBaumerSrc * src)
                 ret = BGAPI2_DataStream_QueueBuffer(src->datastream, buffer);
                 HANDLE_BGAPI2_ERROR ("Unable to queue buffer");
         }
+
+        return TRUE;
+
+error:
+        return FALSE;
+}
+
+/* TODO: use src->num_capture_buffers if BGAPI2_DataStream_GetNumAnnounced()
+ * fails */
+static gboolean
+gst_baumer_src_discard_buffers (GstBaumerSrc * src)
+{
+        guint i;
+        guint64 num_buffers = 0;
+        BGAPI2_RESULT ret;
+        ret = BGAPI2_DataStream_DiscardAllBuffers(src->datastream);
+        HANDLE_BGAPI2_ERROR ("Unable to discard buffers");
+
+        /* It should be equal to src->num_capture_buffers but who knows... */
+        ret = BGAPI2_DataStream_GetNumAnnounced(src->datastream, &num_buffers);
+        HANDLE_BGAPI2_ERROR ("Unable to get announced buffer number");
+
+        for (i = 0; i < num_buffers; i++) {
+                BGAPI2_Buffer * buffer;
+                ret = BGAPI2_DataStream_GetBufferID(src->datastream, 0, &buffer);
+                HANDLE_BGAPI2_ERROR ("Unable to get buffer ID");
+                ret = BGAPI2_DataStream_RevokeBuffer(src->datastream, buffer, NULL);
+                HANDLE_BGAPI2_ERROR ("Unable to revoke buffer");
+                ret = BGAPI2_DeleteBuffer(buffer, NULL);
+                HANDLE_BGAPI2_ERROR ("Unable to delete buffer");
+    }
 
         return TRUE;
 
@@ -635,16 +668,24 @@ error:
         return FALSE;
 }
 
+/* TODO: error handling */
 static gboolean
 gst_baumer_src_stop (GstBaseSrc * bsrc)
 {
         GstBaumerSrc *src = GST_BAUMER_SRC (bsrc);
+        BGAPI2_Node * node = NULL;
 
         GST_DEBUG_OBJECT (src, "stop");
 
+        BGAPI2_Device_GetRemoteNode(src->device, "AcquisitionAbort", &node);
+        BGAPI2_Node_Execute(node);
+        BGAPI2_Device_GetRemoteNode(src->device, "AcquisitionStop", &node);
+        BGAPI2_Node_Execute(node);
+        BGAPI2_DataStream_StopAcquisition(src->datastream);
+
         if (src->datastream) {
+                gst_baumer_src_discard_buffers (src);
                 BGAPI2_DataStream_Close (src->datastream);
-                BGAPI2_DataStream_DiscardAllBuffers(src->datastream);
                 src->datastream = NULL;
         }
 
@@ -668,6 +709,99 @@ gst_baumer_src_stop (GstBaseSrc * bsrc)
 
         return TRUE;
 }
+
+/* static void
+ * gst_baumer_src_set_caps_from_camera (GstBaumerSrc * src)
+ * {
+ *   guint bpp;
+ *   gint idsColorMode;
+ *   GstVideoFormat videoFormat = GST_VIDEO_FORMAT_UNKNOWN;
+ *   GstVideoInfo vinfo;
+ *   IS_SIZE_2D imageSize;
+ *   INT ret;
+ *
+ *   if (src->caps) {
+ *     gst_caps_unref (src->caps);
+ *     src->caps = NULL;
+ *   }
+ *
+ *   idsColorMode = is_SetColorMode (src->hCam, IS_GET_COLOR_MODE);
+ *
+ *   switch (idsColorMode) {
+ *     case IS_CM_SENSOR_RAW8:
+ *       bpp = 8;
+ *       videoFormat = GST_VIDEO_FORMAT_GRAY8;
+ *       break;
+ *     case IS_CM_MONO8:
+ *       bpp = 8;
+ *       videoFormat = GST_VIDEO_FORMAT_GRAY8;
+ *       break;
+ *     case IS_CM_MONO10:
+ *       bpp = 10;
+ *       videoFormat = GST_VIDEO_FORMAT_GRAY16_BE;
+ *       break;
+ *     case IS_CM_MONO12:
+ *       bpp = 12;
+ *       videoFormat = GST_VIDEO_FORMAT_GRAY16_BE;
+ *       break;
+ *     case IS_CM_MONO16:
+ *       bpp = 16;
+ *       videoFormat = GST_VIDEO_FORMAT_GRAY16_BE;
+ *       break;
+ *     case IS_CM_BGR8_PACKED:
+ *       bpp = 24;
+ *       videoFormat = GST_VIDEO_FORMAT_BGR;
+ *       break;
+ *     case IS_CM_RGB8_PACKED:
+ *       bpp = 24;
+ *       videoFormat = GST_VIDEO_FORMAT_RGB;
+ *       break;
+ *     case IS_CM_RGBA8_PACKED:
+ *       bpp = 32;
+ *       videoFormat = GST_VIDEO_FORMAT_RGBA;
+ *       break;
+ *     case IS_CM_BGRA8_PACKED:
+ *       bpp = 32;
+ *       videoFormat = GST_VIDEO_FORMAT_BGRA;
+ *       break;
+ *   }
+ *
+ *   if (videoFormat == GST_VIDEO_FORMAT_UNKNOWN) {
+ *     GST_ELEMENT_ERROR (src, STREAM, WRONG_TYPE,
+ *         ("Unknown or unsupported color format: %d", idsColorMode), (NULL));
+ *     return;
+ *   }
+ *
+ *   ret = is_AOI (src->hCam, IS_AOI_IMAGE_GET_SIZE, (void *) &imageSize,
+ *       sizeof (imageSize));
+ *   if (ret != IS_SUCCESS) {
+ *     GST_ELEMENT_ERROR (src, STREAM, WRONG_TYPE,
+ *         ("Failed to query AOI size"), (NULL));
+ *     return;
+ *   }
+ *
+ *   src->width = imageSize.s32Width;
+ *   src->height = imageSize.s32Height;
+ *
+ *   gst_video_info_init (&vinfo);
+ *
+ *   gst_video_info_set_format (&vinfo, videoFormat, src->width, src->height);
+ *   src->caps = gst_video_info_to_caps (&vinfo);
+ *
+ *   if (videoFormat == GST_VIDEO_FORMAT_GRAY16_BE) {
+ *     GValue val = G_VALUE_INIT;
+ *     GstStructure *s;
+ *
+ *     /\* set bpp, extra info for GRAY16 so elements can scale properly *\/
+ *     s = gst_caps_get_structure (src->caps, 0);
+ *     g_value_init (&val, G_TYPE_INT);
+ *     g_value_set_int (&val, bpp);
+ *     gst_structure_set_value (s, "bpp", &val);
+ *     g_value_unset (&val);
+ *   }
+ *
+ *   src->bitsPerPixel = bpp;
+ * } */
 
 static GstBuffer *
 gst_baumer_src_get_buffer (GstBaumerSrc * src)

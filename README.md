@@ -6,6 +6,7 @@ GStreamer plugins related to the field of machine vision.
 ## Image acquisition elements
 
 - aptinasrc: Video source for [Aptina Imaging (On Semiconductor) dev kits][14] (USB dev kits)
+- baumersrc: Video source for [Baumer GAPI SDK sources][21] (USB3 Vision)
 - bitflowsrc: Video source for [BitFlow frame grabbers][10] (analog, Camera Link, CoaXPress)
 - edtpdvsrc: Video source for [EDT PDV frame grabbers][1] (Camera Link)
 - euresyssrc: Video source for [Euresys PICOLO, DOMINO and GRABLINK series frame grabbers][3] (analog, Camera Link)
@@ -140,3 +141,4 @@ See also
 [18]: http://www.ab-soft.com/gigesim.php
 [19]: https://www.pleora.com
 [20]: https://www.baslerweb.com/
+[21]: https://www.baumer.com/

@@ -42,9 +42,7 @@ struct _GstBaumerSrc {
         guint32 total_dropped_frames;
 
         GstCaps *caps;
-        gint height;
-        gint gst_stride;
-
+        gint height, width, bpp;
         gboolean stop_requested;
 };
 
