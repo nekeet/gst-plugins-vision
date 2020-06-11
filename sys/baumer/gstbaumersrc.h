@@ -20,30 +20,28 @@ typedef struct _GstBaumerSrcClass GstBaumerSrcClass;
 struct _GstBaumerSrc {
         GstPushSrc base_baumer_src;
 
-        /* BGAPI2_System system; */
         BGAPI2_System *system;
         BGAPI2_Interface *interface;
         BGAPI2_Device *device;
         BGAPI2_DataStream *datastream;
         char error_string[MAX_ERROR_STRING_LEN];
+        gboolean device_connected;
+        gboolean acquisition_configured, acquisition_started;
 
         /* properties */
-        guint interface_index;
-        gchar *interface_id;
-        guint device_index;
-        gchar *device_id;
-        guint datastream_index;
-        gchar *datastream_id;
+        guint interface_index, device_index, datastream_index;
         guint num_capture_buffers;
         gint timeout;
 
         GstClockTime acq_start_time;
-        guint32 last_frame_count;
-        guint32 total_dropped_frames;
+        guint32 last_frame_count, total_dropped_frames;
+        guint64 payload_size;
 
         GstCaps *caps;
-        gint height, width, bpp;
+        gint height, width, max_width, max_height, binningh, binningv;
         gboolean stop_requested;
+        gdouble framerate, exposure_time, gain;
+        gchar *pixel_format;
 };
 
 struct _GstBaumerSrcClass {
