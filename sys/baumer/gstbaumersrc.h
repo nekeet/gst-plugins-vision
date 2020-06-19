@@ -32,6 +32,8 @@ struct _GstBaumerSrc {
         guint interface_index, device_index, datastream_index;
         guint num_capture_buffers;
         gint timeout;
+        guint64 timestamp_offset;
+        guint64 last_timestamp;
 
         GstClockTime acq_start_time;
         guint32 last_frame_count, total_dropped_frames;

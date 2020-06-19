@@ -1390,6 +1390,10 @@ gst_baumer_src_create (GstPushSrc * psrc, GstBuffer ** buf)
         BGAPI2_Buffer * buffer_filled = NULL;
         bo_bool buffer_is_incomplete = 0;
         gpointer data_ptr = NULL;
+        guint64 timestamp;
+        gboolean base_src_does_timestamp;
+
+        base_src_does_timestamp = gst_base_src_get_do_timestamp(GST_BASE_SRC(psrc));
 
         GST_LOG_OBJECT (src, "create");
 
@@ -1408,6 +1412,9 @@ gst_baumer_src_create (GstPushSrc * psrc, GstBuffer ** buf)
         ret = BGAPI2_Buffer_GetMemPtr(buffer_filled, &data_ptr);
         HANDLE_BGAPI2_ERROR ("Failed to get buffer pointer");
 
+        ret = BGAPI2_Buffer_GetTimestamp(buffer_filled, &timestamp);
+        HANDLE_BGAPI2_ERROR ("Failed to get buffer timestamp");
+
         if (buffer_is_incomplete != 1) {
                 VideoFrame *vf = (VideoFrame *) g_malloc0 (sizeof (VideoFrame));
 
@@ -1422,6 +1429,18 @@ gst_baumer_src_create (GstPushSrc * psrc, GstBuffer ** buf)
                 GST_ERROR_OBJECT (src, "Error in the image processing loop");
                 goto error;
         }
+
+        if (!base_src_does_timestamp) {
+                if (src->timestamp_offset == 0) {
+                        src->timestamp_offset = timestamp;
+                        src->last_timestamp = timestamp;
+                }
+
+                GST_BUFFER_PTS (*buf) = timestamp - src->timestamp_offset;
+                GST_BUFFER_DURATION (*buf) = timestamp - src->last_timestamp;
+                src->last_timestamp = timestamp;
+        }
+
 
           // Set frame offset
         GST_BUFFER_OFFSET (*buf) = src->last_frame_count;
@@ -1484,6 +1503,9 @@ gst_baumer_src_set_caps (GstBaseSrc *bsrc, GstCaps *caps)
 
         if (src->pixel_format == NULL)
                 goto unsupported_caps;
+
+        src->timestamp_offset = 0;
+        src->last_timestamp = 0;
 
         return TRUE;
 
